@@ -7,8 +7,7 @@
 #' @param length.unit A character argument giving the unit of \code{length}. Will be used in the labels of the figure.
 #' @param length.bin.width Numeric specifying the increment (delta length) by which length data should be binned to calculate maturity proportions. Use \code{NULL} to remove from the plot.
 #' @param split.by.sex Logical indicating whether the result should be split by sex.
-#' @param female.sex A character denoting female sex in the \code{sex} column of \code{dt}
-#' @param male.sex A character denoting male sex in the \code{sex} column of \code{dt}
+#' @param female.sex,male.sex A character or integer denoting female and male sex in the \code{sex} column of \code{dt}, respectively.
 #' @param bootstrap.n Integer defining the number of bootstrap replicates to be used to calculate 95\% confidence intervals for the mean 50\% mature estimate. If \code{NA} (default), the confidence intervals are calculated from the glm object without boostrapping. See Details.
 #' @param force.zero.group.length Numeric indicating the length to which 0-group (all immatures) should be forced. Use \code{NA} ignore the forcing.
 #' @param force.zero.group.cv Numeric indicating the coefficient of variation for the forced 0-group (all immature) length. Resulting lengths will be randomly generated from a normal distribution.
@@ -46,8 +45,7 @@
 #' @export
 
 # Debug parameters
-# dt = survey_ghl; length = "length"; maturity = "maturity"; sex = "sex"; split.by.sex = FALSE; female.sex = "F"; male.sex = "M"; length.unit = "cm"; length.bin.width = 2; bootstrap.n = 10; force.zero.group.length = NA; force.zero.group.strength = NA; force.zero.group.n = NA; force.zero.group.cv = 0; xlab = "Total length"; base_size = 8; legend.position = "bottom"
-# dt = x; length = "Length"; maturity = "Mature"; sex = "Sex"; split.by.sex = T; female.sex = "F"; male.sex = "M"; length.unit = "cm"; bootstrap.n = NA; length.bin.width = 2; force.zero.group.length = 0; force.zero.group.strength = NA; force.zero.group.n = c("F" = 256, "M" = 174); force.zero.group.cv = 0; xlab = "Total length"; base_size = 8; legend.position = "bottom"
+# length = "length"; maturity = "maturity"; sex = "sex"; split.by.sex = FALSE; female.sex = "F"; male.sex = "M"; length.unit = "cm"; length.bin.width = 2; bootstrap.n = NA; force.zero.group.length = NA; force.zero.group.strength = NA; force.zero.group.n = NA; force.zero.group.cv = 0; xlab = "Total length"; base_size = 8; legend.position = "bottom"
 
 plot_maturity <- function(dt, length = "length", maturity = "maturity", sex = "sex", split.by.sex = FALSE, female.sex = "F", male.sex = "M", length.unit = "cm", length.bin.width = 2, bootstrap.n = NA, force.zero.group.length = NA, force.zero.group.strength = NA, force.zero.group.n = NA, force.zero.group.cv = 0, xlab = "Total length", base_size = 8, legend.position = "bottom", ...) {
 
@@ -117,6 +115,10 @@ plot_maturity <- function(dt, length = "length", maturity = "maturity", sex = "s
       dplyr::rename("sex" = tidyselect::all_of(sex)) %>%
       dplyr::filter(!is.na(sex)) %>%
       dplyr::select(length, sex, maturity)
+
+    if(inherits(dt$sex, "numeric")) {
+      dt$sex <- as.character(dt$sex)
+    }
 
     ## More checks
     # if(!inherits(female.sex, class(dt$sex))) stop("female.sex (or male.sex) is not the same class as dt[[sex]].")
@@ -302,11 +304,14 @@ if(split.by.sex) {
   p <-
     ggplot() +
     #facet_wrap(~sex, ncol = 1) +
-    {if(!is.null(length.bin.width)) geom_step(data = mat.pr.dt, aes(x = bin1, y = mat.pr, color = sex), alpha = 0.5)} +
+    {if(!is.null(length.bin.width)) {
+      geom_step(data = mat.pr.dt, aes(x = bin1, y = mat.pr, color = sex, group = sex),
+                alpha = 0.5)
+      }} +
     ggridges::geom_density_ridges(
       data = dt,
       aes(x = length, y = maturity, group = paste(sex, maturity), fill = sex),
-      scale = 0.3, size = 0.5/2.13, alpha = 0.5, ...) +
+      scale = 0.3, linewidth = 0.5/2.13, alpha = 0.5, ...) +
     geom_segment(data = modDat,
                  aes(x = mean, xend = mean, y = 0, yend = 0.5, color = sex),
                  linetype = 3, linewidth = 0.7/2.13) +
@@ -320,9 +325,9 @@ if(split.by.sex) {
               aes(x = mean,
                   y = -0.07, label =
                     paste0(round(mean, 1), " ", length.unit, "\n(n = ", n, ")"),
-                  color = sex), size = base_size/2.845276,
-              direction = "x", min.segment.length = 100) +
-    stat_smooth(data = dt, aes(x = length, y = maturity, color = sex),
+                  color = sex), size = 0.8*base_size/2.845276,
+              direction = "x", min.segment.length = 100, force = 4) +
+    stat_smooth(data = dt, aes(x = length, y = maturity, color = sex, group = sex),
                 method = "glm", formula = y ~ x,
                 method.args = list(family = "binomial"), linewidth = 1/2.13) +
     scale_x_continuous(paste0(xlab, " (", length.unit, ")"), expand = c(0,0)) +
@@ -353,7 +358,7 @@ if(split.by.sex) {
     geom_text(data = modDat,
               aes(x = mean, y = -0.03, label =
                     paste0(round(mean, 1), " ", length.unit, " (n = ", n, ")")),
-              size = base_size/2.845276) +
+              size = 0.8*base_size/2.845276) +
     stat_smooth(data = dt, aes(x = length, y = maturity),
                 method = "glm", formula = y ~ x,
                 method.args = list(family = "binomial"), linewidth = 1/2.13) +
